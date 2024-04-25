@@ -84,6 +84,7 @@ GLOBAL_COEFFS = [
     'Cx', 'Cy', 'Cz',
     'CD', 'CC', 'CL',
     'Cl', 'Cm', 'Cn',
+    'CLd'
 ]
 
 

@@ -226,6 +226,38 @@ def pre_panelling(aircraft):
                 continue
             segment.add_subdivision(eta, eta, ignore_inval_eta=True)
 
+def cal_areas(lattice):
+    
+    # num_p = lattice.info['num_panels']
+
+    # ===== COMPUTE PANEL PROPERTIES =====
+    # ref_areas = np.zeros((num_p), dtype=float, order='C')
+    # spc_areas = np.zeros((num_p), dtype=float, order='C')
+    
+    # Panel span through centre
+    span_vec = 0.5 * (lattice.p[:, 1] - lattice.p[:, 0] + lattice.p[:, 2] - lattice.p[:, 3])
+    span     = np.linalg.norm(span_vec, ord=2, axis=1)
+
+    # Panel chord through centre
+    chord_vec = 0.5 * (lattice.p[:, 3] - lattice.p[:, 0] + lattice.p[:, 2] - lattice.p[:, 1])
+    chord     = np.linalg.norm(chord_vec, ord=2, axis=1)
+
+    area = span * chord
+    aspect = span / chord
+
+    ref_areas = 0.5 * (np.abs(np.cross(lattice.p[:, 1, :2] - lattice.p[:, 0, :2], 
+                                       lattice.p[:, 3, :2] - lattice.p[:, 0, :2], axis=1)) +
+                       np.abs(np.cross(lattice.p[:, 1, :2] - lattice.p[:, 2, :2], 
+                                       lattice.p[:, 3, :2] - lattice.p[:, 2, :2], axis=1)))
+
+    lattice.ref_areas = ref_areas
+    lattice.a = area       
+    lattice.info['area_max'] = np.max(area)
+    lattice.info['area_min'] = np.min(area)
+    lattice.info['area_avg'] = np.mean(area)
+    lattice.info['aspect_max'] = np.max(aspect)
+    lattice.info['aspect_min'] = np.min(aspect)
+    lattice.info['aspect_avg'] = np.mean(aspect)
 
 def gen_lattice(aircraft, state, settings, make_new_subareas=True):
     """
@@ -364,7 +396,9 @@ def gen_lattice(aircraft, state, settings, make_new_subareas=True):
     logger.info("Generating lattice...")
     c_vlm.py2c_lattice(lattice, state, array_subareas, array_symmetry, array_panels)
 
-    # ----- Compute the length of the bound leg -----
+    cal_areas(lattice)
+
+    # ----- Print the infomation of meshing -----
     logger.info(f"--> Number of panels: {lattice.info['num_panels']}")
     logger.info(f"--> Min panel area = {lattice.info['area_min']:.3e}")
     logger.info(f"--> Max panel area = {lattice.info['area_max']:.3e}")
@@ -372,6 +406,11 @@ def gen_lattice(aircraft, state, settings, make_new_subareas=True):
     logger.info(f"--> Min panel aspect ratio = {lattice.info['aspect_min']:.3e}")
     logger.info(f"--> Max panel aspect ratio = {lattice.info['aspect_max']:.3e}")
     logger.info(f"--> Avg panel aspect ratio = {lattice.info['aspect_avg']:.3e}")
+
+    # if reference area was not set in settings, use calculation results here
+    if state.refs['area'] <= 0.:
+        state.refs['area'] = sum(lattice.ref_areas)
+        logger.info(f"Recalculating reference area = {sum(lattice.ref_areas):.3e}")
 
     # ========== ROTATE NORMALS ==========
     if settings.settings['_do_normal_rotations']:
@@ -484,6 +523,41 @@ def solver(vlmdata):
 ########
 ########
 
+def _deg2rad(deg):
+    return deg / 180 * np.pi
+
+def _B2W(alpha, beta):
+    '''
+    Rotation matrix (see Drela)
+    Transforms loads from global coordinate system (geometry axes) to wind axes
+    '''
+
+    b2w = np.zeros((3, 3))
+
+    alpha = _deg2rad(alpha)
+    beta = _deg2rad(beta)
+
+    sin_a = np.sin(alpha)
+    cos_a = np.cos(alpha)
+    sin_b = np.sin(beta)
+    cos_b = np.cos(beta)
+
+    b2w = np.array([[cos_b*cos_a, -sin_b, cos_b*sin_a],
+                    [sin_b*cos_a, cos_b,  sin_b*sin_a],
+                    [-sin_a,      0.0,    cos_a      ]])
+
+    return b2w
+
+def _dyn_pressure(state):
+    # Dynamic pressure
+    q = 0.5 * state.aero['density'] * state.aero['airspeed']**2
+
+    # Avoid division by 0
+    if q <= 0:
+        q = 1
+        print("WARNING: Dynamic pressure was 0 (set to 1 instead)!\n")
+
+    return q
 
 def calc_results(lattice, state, vlmdata):
     """
@@ -504,6 +578,36 @@ def calc_results(lattice, state, vlmdata):
 
     logger.info("Computing results...")
     c_vlm.py2c_results(lattice, state, vlmdata)
+
+    q = _dyn_pressure(state)
+    n_sub = len(lattice.panel_bookkeeping)
+    f_subarea        = np.zeros((n_sub, 3), dtype=float, order='C')
+    ref_area_subarea = np.zeros((n_sub, 1), dtype=float, order='C')
+
+    for i, entry in enumerate(lattice.panel_bookkeeping):
+        pan_idx = entry.pan_idx
+        mirror = entry.mirror
+        # print(pan_idx, mirror)
+        i_span = int(n_sub / 2) + (1, -1)[mirror] * int((i + 1) / 2)
+        # print(i_span)
+        f_subarea[i_span, 0] = sum(np.take(vlmdata.panelwise['fx'], pan_idx))
+        f_subarea[i_span, 1] = sum(np.take(vlmdata.panelwise['fy'], pan_idx))
+        f_subarea[i_span, 2] = sum(np.take(vlmdata.panelwise['fz'], pan_idx))
+        ref_area_subarea[i_span] = sum(np.take(lattice.ref_areas, pan_idx))
+
+    # Force coefficients
+    cf_subarea = f_subarea / q / ref_area_subarea
+    # CD, CC, CL
+    cw_subarea = np.einsum('ij,sj->si', _B2W(state.aero['alpha'], state.aero['beta']), cf_subarea)
+    vlmdata.stripwise['cl'] = cw_subarea[:, 2]
+    vlmdata.stripwise['cd'] = cw_subarea[:, 0]
+    # print(cw_subarea)
+    # from matplotlib import pyplot as plt
+    # plt.plot(range(cw_subarea.shape[0]), cw_subarea[:, 2])
+    # plt.plot(range(n_sub), cw_subarea[:, 2])
+    # plt.show()
+    # print(np.sum(cw_subarea * ref_area_subarea, axis=0) / np.sum(ref_area_subarea))
+    # print(np.sum(cw_subarea * ref_area_subarea, axis=0) / state.refs['area'])
 
     logger.info(f"--> Fx = {vlmdata.forces['x']:10.3e}")
     logger.info(f"--> Fy = {vlmdata.forces['y']:10.3e}")

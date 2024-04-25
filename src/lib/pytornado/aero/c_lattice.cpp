@@ -248,43 +248,43 @@ void vlm_lattice(latticestruct* lattice, infostruct* info, statestruct* state,
                     lattice->N[index_N + 2] = n_z/norm;
 
                     // ===== COMPUTE PANEL PROPERTIES =====
-                    double span_x = 0.5*( lattice->P[index_Q    ] - lattice->P[index_P    ]
-                                        + lattice->P[index_R    ] - lattice->P[index_S    ] );
+                    // double span_x = 0.5*( lattice->P[index_Q    ] - lattice->P[index_P    ]
+                    //                     + lattice->P[index_R    ] - lattice->P[index_S    ] );
 
-                    double span_y = 0.5*( lattice->P[index_Q + 1] - lattice->P[index_P + 1]
-                                        + lattice->P[index_R + 1] - lattice->P[index_S + 1] );
+                    // double span_y = 0.5*( lattice->P[index_Q + 1] - lattice->P[index_P + 1]
+                    //                     + lattice->P[index_R + 1] - lattice->P[index_S + 1] );
 
-                    double span_z = 0.5*( lattice->P[index_Q + 2] - lattice->P[index_P + 2]
-                                        + lattice->P[index_R + 2] - lattice->P[index_S + 2] );
+                    // double span_z = 0.5*( lattice->P[index_Q + 2] - lattice->P[index_P + 2]
+                    //                     + lattice->P[index_R + 2] - lattice->P[index_S + 2] );
 
-                    // Panel span through centre
-                    double span = sqrt(span_x*span_x + span_y*span_y + span_z*span_z);
+                    // // Panel span through centre
+                    // double span = sqrt(span_x*span_x + span_y*span_y + span_z*span_z);
 
-                    double chord_x = 0.5*( lattice->P[index_S    ] - lattice->P[index_P   ]
-                                         + lattice->P[index_R    ] - lattice->P[index_Q   ] );
+                    // double chord_x = 0.5*( lattice->P[index_S    ] - lattice->P[index_P   ]
+                    //                      + lattice->P[index_R    ] - lattice->P[index_Q   ] );
 
-                    double chord_y = 0.5*( lattice->P[index_S + 1] - lattice->P[index_P + 1]
-                                         + lattice->P[index_R + 1] - lattice->P[index_Q + 1] );
+                    // double chord_y = 0.5*( lattice->P[index_S + 1] - lattice->P[index_P + 1]
+                    //                      + lattice->P[index_R + 1] - lattice->P[index_Q + 1] );
 
-                    double chord_z = 0.5*( lattice->P[index_S + 2] - lattice->P[index_P + 2]
-                                         + lattice->P[index_R + 2] - lattice->P[index_Q + 2] );
+                    // double chord_z = 0.5*( lattice->P[index_S + 2] - lattice->P[index_P + 2]
+                    //                      + lattice->P[index_R + 2] - lattice->P[index_Q + 2] );
 
-                    // Panel chord through centre
-                    double chord = sqrt(chord_x*chord_x + chord_y*chord_y + chord_z*chord_z);
-                    double area = span*chord;
-                    double aspect = span/chord;
+                    // // Panel chord through centre
+                    // double chord = sqrt(chord_x*chord_x + chord_y*chord_y + chord_z*chord_z);
+                    // double area = span*chord;
+                    // double aspect = span/chord;
 
-                    if (area > info->area_max) { info->area_max = area; }
-                    if (area < info->area_min) { info->area_min = area; }
-                    if (aspect > info->aspect_max) { info->aspect_max = aspect; }
-                    if (aspect < info->aspect_min) { info->aspect_min = aspect; }
+                    // if (area > info->area_max) { info->area_max = area; }
+                    // if (area < info->area_min) { info->area_min = area; }
+                    // if (aspect > info->aspect_max) { info->aspect_max = aspect; }
+                    // if (aspect < info->aspect_min) { info->aspect_min = aspect; }
 
-                    // Update lattice metrics
-                    info->area_avg += area;
-                    info->aspect_avg += aspect;
+                    // // Update lattice metrics
+                    // info->area_avg += area;
+                    // info->aspect_avg += aspect;
 
-                    // Panel area
-                    lattice->A[start_pan + index_pan] = area;
+                    // // Panel area
+                    // lattice->A[start_pan + index_pan] = area;
                 }
             }
             start_pan += pan_seg;

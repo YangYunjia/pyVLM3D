@@ -161,6 +161,8 @@ def standard_run(args):
         state.results['Cl'].append(vlmdata.coeffs['l'])
         state.results['Cm'].append(vlmdata.coeffs['m'])
         state.results['Cn'].append(vlmdata.coeffs['n'])
+        ####
+        state.results['CLd'].append(vlmdata.stripwise['cl'])
         ###############################################
 
     # ---------- Save aeroperformance map ----------
