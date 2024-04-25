@@ -263,7 +263,7 @@ def _init_plot3d(title=''):
     """
 
     figure_3d = plt.figure(figsize=(12, 12), edgecolor=C.BLACK)
-    axes_3d = figure_3d.gca(projection='3d')
+    axes_3d = figure_3d.add_subplot(projection='3d')
 
     # --> Matplotlib version 3.1.1 raises NotImplementedError
     # --> See: https://github.com/matplotlib/matplotlib/issues/1077
@@ -702,7 +702,7 @@ def add_results(axes_2d, axes_3d, figure_3d, vlmdata, lattice, aircraft, key):
 
     cbar = cm.ScalarMappable(cmap=C.COLORMAP)
     cbar.set_array(vlmdata.panelwise[key])
-    cb = figure_3d.colorbar(cbar)
+    cb = figure_3d.colorbar(cbar, ax=axes_3d)
     cb.set_label(key)
 
 
