@@ -44,6 +44,8 @@ ALTITUDE = 'altitude'
 BETA = 'beta'
 DENSITY = 'density'
 MACH = 'mach'
+REYNOLD = 'reynold'
+TEMP = 'temperature'
 RATE_P = 'rate_P'
 RATE_Q = 'rate_Q'
 RATE_R = 'rate_R'
@@ -55,6 +57,8 @@ STATE_ALL_PARAMS = [
     BETA,
     DENSITY,
     MACH,
+    REYNOLD,
+    TEMP,
     RATE_P,
     RATE_Q,
     RATE_R,
@@ -75,6 +79,8 @@ STATE_PRIMARY_PARAMS = [
 STATE_SECONDARY_PARAMS = [
     ALTITUDE,
     MACH,
+    REYNOLD,
+    TEMP,
 ]
 
 GLOBAL_COEFFS = [
@@ -87,6 +93,11 @@ GLOBAL_COEFFS = [
     'CLd'
 ]
 
+def sutherland(t):
+    mu_0 = 1.716e-5
+    t_ref = 273.15
+    s = 110.4
+    return mu_0 * (t / t_ref)**1.5 * (t_ref + s) / (t + s)
 
 class CurrentState:
 
@@ -172,11 +183,12 @@ class FlightState:
         self.num_apm_entries = int(list(array_lenghts)[0])
 
         # ----- We can allow different input combinations -----
-        all_props = {AIRSPEED, MACH, DENSITY, ALTITUDE}
+        all_props = {AIRSPEED, MACH, DENSITY, ALTITUDE, REYNOLD, TEMP}
         valid_prop_pairs = [
             {AIRSPEED, DENSITY},
             {AIRSPEED, ALTITUDE},
             {MACH, ALTITUDE},
+            {MACH, REYNOLD, TEMP}
         ]
 
         is_input = {prop: False for prop in all_props}
@@ -192,6 +204,7 @@ class FlightState:
             (1) 'airspeed' and 'density' or
             (2) 'airspeed' and 'altitude' or
             (3) 'mach' and 'altitude'
+            (4) 'mach', 'reynold' and 'temperature'
             Make sure the remaining values are all set to 'None'.
             """
             raise ValueError(err_msg)
@@ -206,12 +219,23 @@ class FlightState:
             atmosphere = Atmosphere(self.aero[ALTITUDE])
             density = np.array(atmosphere.density)
             speed_of_sound = np.array(atmosphere.speed_of_sound)
-
-        if not is_input[DENSITY]:
-            self.aero[DENSITY] = density
+        
+        if is_input[TEMP]:
+            speed_of_sound = (1.4 * 287 * self.aero[TEMP])**0.5
+            viscousity = sutherland(self.aero[TEMP])
 
         if is_input[MACH]:
             self.aero[AIRSPEED] = self.aero[MACH]*speed_of_sound
+
+        if is_input[REYNOLD]:
+            self.aero[DENSITY] = self.aero[REYNOLD] * viscousity / self.aero[AIRSPEED]
+
+        elif not is_input[DENSITY]:
+            self.aero[DENSITY] = density
+
+        logger.info(f"Freestream condition set from {input_props}'")
+        logger.info(f"--> Density  = {self.aero[DENSITY]}")
+        logger.info(f"--> Airspeed = {self.aero[AIRSPEED]}")
 
         self.check_values()
 
